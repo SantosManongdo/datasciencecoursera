@@ -1,0 +1,112 @@
+----------------------------------------------------
+title: "Getting and Cleaning Data Course Project"
+author: "Maricel Santos-Manongdo"
+date: "22/03/2020"
+----------------------------------------------------
+
+Getting and Cleaning the Data Course Project
+
+
+Project overview
+
+This course project aims to demonstrate the ability to collect, work with, and clean a data set. The data used in this project came from the Human Activity Recognition Using Smartphones experiments conducted by Davide Anguita, Alessandro Ghio, Luca Oneto, Xavier Parra and Jorge L. Reyes-Ortiz.  As mentioned in the Features_info document, the experiments have been carried out with a group of 30 volunteers wearing a smartphone on their waist while performing six activities (WALKING, WALKING_UPSTAIRS, WALKING_DOWNSTAIRS, SITTING, STANDING, LAYING). Using the embedded accelerometer and gyroscope in the smartphone, the 3-axial linear acceleration and 3-axial angular velocity were captured  at a constant rate of 50Hz. The data collected were randomly partitioned into two sets where measurements from 70% of the volunteers were marked as training data and the remaining 30% as test data. A full description of the  features is available at this site > (http://archive.ics.uci.edu/ml/datasets/Human+Activity+Recognition+Using+Smartphonesm).
+
+The data itself can be downloaded from this url,(https://d396qusza40orc.cloudfront.net/getdata%2Fprojectfiles%2FUCI%20HAR%20Dataset.zip) and a detailed description of the data can be read in the README.txt. This and the following files are contained in the zipped file:
+* 'features_info.txt': Shows information about the variables used on the feature vector.
+* 'features.txt': List of measurement feature names
+* 'activity_labels.txt': Links the class labels with their activity name.
+* 'train/X_train.txt': Training set - 70 % of the randomly partitioned measurement data obtained from volunteers.
+* 'train/y_train.txt': Training labels - numeric value of the activity for which the training measurement data were obtained.
+* 'train/subject_train.txt' Train subject identifier refers the volunteer who performed the activity.
+* 'test/X_test.txt': Test set - 30 % of the randomly partitioned measurement data obtained from volunteers.
+* 'test/y_test.txt': Test labels -  numeric value of the activity for which the test measurements data were obtained.
+* 'test/subject_test.txt' Test subject identifier refers the volunteer who performed the activity.
+
+
+Project Objective
+
+To reinforce the learning in this course, this project provides a list of tasks to complete which are as follows:
+
+	1. Merge the training and the test sets to create one data set.
+	2. Extract only the measurements on the mean and standard deviation for each measurement.
+	3. Use the descriptive activity names to name the activities in the data set
+	4. Appropriately label the data set with descriptive variable names.
+	5. From the data set in step 4, creates a second, independent tidy data set with the average of each variable for each activity and each subject
+
+
+Getting the data
+
+Using the download.file(), the .zip file  was downloaded and saved to a temporary file in a  temporary directory using the base R functions tempdir() and tempfile(). Since there are more than 1 file contained in the zipped file, each individual file was unzipped to a temporary directory. Full path where the file was saved in the temporary directory was captured. The fread() function from the data.table package is used to read in the data. Example of the code to load and read in the first file in the zipped file is shown below. 
+
+
+
+#  Create a temporary directory and file to store the file to download
+td = tempdir()
+tf  = tempfile(tmpdir=tempdir(), fileext=".zip")
+
+# Download the data from the url.
+download.file("https://d396qusza40orc.cloudfront.net/getdata%2Fprojectfiles%2FUCI%20HAR%20Dataset.zip",destfile =  tf, method = "curl")
+
+# Get the name of the first file in the zip archive
+fname1 = unzip(tf, list=TRUE)$Name[1]
+# Unzip the file to the temporary directory
+unzip(tf, files=fname1, exdir=td, overwrite=TRUE)
+# Get the full path to the extracted file
+fpath1 = file.path(td, fname1)
+# fname1 contains the activity labels
+activty_label <- fread(fpath1,sep = " ", header = F)
+
+
+
+This set of codes from assigning the zipped file to a temp file through to reading the file to the global environment in RStudio is repeated until all files in the downloaded zipped file is read.
+
+When train and test data are already in the global environmet, rbind() is performed to combine the two sets of data into one dataset.
+
+The combined dataset has 563 variables or features and 10299 observations. There were 561  features and the other 2 columns were the subject identifier and the activity label.
+
+
+## Cleaning the data
+
+Using sapply() to check for the mean and standard deviation of each measurement features. Here's code used to obtain the mean and standard deviation for each feature column.
+
+
+sapply(data_X, function(x) c("Mean" = mean(x, na.rm = TRUE),
+                           "Std. Dev" = sd(x)))
+
+where data_X here is the combination of train_data_X and test_data_X.
+
+
+For task 3, the numeric activity label in train_data_Y and test_data_Y need to be replaced by he activity description. The lookup table containing the activity description is in the features.txt. The row bined train and test data_Y label was left joined with the features lookup table to complete the task. Up to this point, all 563 columns are not properly labelled with column or feature names. Correct label for data_X are in the feature.txt zipped file.
+
+The feature.txt file was unzipped and read in the global environment. Checking the feature names, special characters were present that will cause issue when the data is manipuated and analysed at a later stage. The cleaning of the feature names involved identifying the special characters using regular expression and the gsub() function to replace the characters with underscore or null value. Here's the cleaning code used to replace comma and hyphen with underscore and "(" and ")" with null.
+
+
+features$V2 <- features$V2 %>%
+          gsub(pattern ="," , replacement = "_") %>%
+          gsub(pattern ="-" , replacement = "_") %>%
+          gsub(pattern = "\\(", replacement = "") %>%
+          gsub(pattern ="\\)" , replacement = "") 
+
+
+After the gsub() character replacement, duplicate names are checked and found. The following code was used to check for duplicate and how to make the feature names unique.
+
+
+# check for any duplicate values
+duplicated(features$V2)
+# make values unique to have unique column names
+features$V2 <- make.unique(features$V2) 
+
+
+Once cleaned, the generic column names were replaced with the appropriate feature names.
+
+
+The last task was performed using chaining from the dplyr package grouping by subject id and activity then summarising by calculating the mean of each column. The output result was then saved as a new tidy dataset. Here's the code used to perform this last task.
+
+
+data_2 <- data %>% group_by(Subj_ID, Activity) %>%
+        summarise_all(list(~mean(.)))
+# save the new dataset as text file
+write.table(data_2, file = "./data_2.txt", row.names = FALSE)
+
+
+
